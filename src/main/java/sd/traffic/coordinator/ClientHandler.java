@@ -3,10 +3,7 @@ package sd.traffic.coordinator;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import sd.traffic.common.Event;
-import sd.traffic.coordinator.models.EventLogEntry;
-import sd.traffic.coordinator.models.RegisterRequest;
-import sd.traffic.coordinator.models.TelemetryPayload;
-import sd.traffic.coordinator.models.VehicleTransfer;
+import sd.traffic.coordinator.models.*;
 import sd.traffic.common.Message;
 import sd.traffic.coordinator.models.VehicleTransfer;
 
@@ -122,6 +119,29 @@ public class ClientHandler extends Thread {
                             okV.addProperty("vehicle", vt.getVehicleId());
                             sendOk(out, okV);
 
+                            break;
+                        }
+
+                        case "PHASE_REQUEST": {
+                            PhaseRequest req = gson.fromJson(gson.toJson(base.getPayload()), PhaseRequest.class);
+
+                            server.getPhaseController().requestGreen(req.getCrossing(), req.getDirection());
+
+                            // envio ACK
+                            JsonObject ack = new JsonObject();
+                            ack.addProperty("status", "PHASE_GRANTED");
+                            sendOk(out, ack);
+                            break;
+                        }
+
+                        case "PHASE_RELEASE": {
+                            PhaseRelease rel = gson.fromJson(gson.toJson(base.getPayload()), PhaseRelease.class);
+
+                            server.getPhaseController().releaseGreen(rel.getCrossing());
+
+                            JsonObject ack = new JsonObject();
+                            ack.addProperty("status", "PHASE_RELEASED");
+                            sendOk(out, ack);
                             break;
                         }
 

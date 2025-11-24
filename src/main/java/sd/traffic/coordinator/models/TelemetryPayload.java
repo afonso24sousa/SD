@@ -3,7 +3,7 @@ import sd.traffic.model.LightColor;
 
 
 /**
- * Payload para TELEMETRY (formato acordado A↔B).
+ * Payload para TELEMETRY.
  * Exemplo do enunciado do contrato:
  * { "type":"Telemetry", "crossing":"Cr1", "queue":4, "avg":2.5 }
  */

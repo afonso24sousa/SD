@@ -2,7 +2,7 @@ package sd.traffic.coordinator.models;
 
 /**
  * Payload para EVENT_LOG — simples e genérico nesta fase.
- * Podes estender futuramente (tipo, simTime, vehicleId, node, etc.)
+ * Estender futuramente (tipo, simTime, vehicleId, node, etc.)
  */
 public class EventLogEntry {
     private String type;      // p.ex. "VEHICLE_ARRIVAL", "START_GREEN", ...

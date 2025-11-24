@@ -32,7 +32,6 @@ public class Edge {
         this.tRoad = tRoad;
     }
 
-    // Getters (não há setters pois as arestas são imutáveis no grafo)
     public NodeId getFrom() { return from; }
     public NodeId getTo() { return to; }
     public double gettRoad() { return tRoad; }

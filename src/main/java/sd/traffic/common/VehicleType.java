@@ -3,12 +3,12 @@ package sd.traffic.common;
 /**
  * Enumeração dos tipos de veículos presentes na simulação.
  *
- * <p>Cada tipo possui:
+ * Cada tipo possui:
  *  - um fator de velocidade relativo (para cálculo de t_road),
  *  - uma percentagem de ocorrência (para geração de tráfego),
- *  - e uma cor usada na visualização (dashboard Swing).</p>
+ *  - e uma cor usada na visualização (dashboard).</p>
  *
- * <p>Exemplo: MOTA é 2x mais rápida que o carro, enquanto CAMIAO é 2x mais lento.</p>
+ * Exemplo: MOTA é 2x mais rápida que o carro, enquanto CAMIAO é 2x mais lento.</p>
  */
 public enum VehicleType {
 

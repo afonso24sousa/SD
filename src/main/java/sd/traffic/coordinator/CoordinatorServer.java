@@ -2,6 +2,7 @@ package sd.traffic.coordinator;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import sd.traffic.common.LamportClock;
 import sd.traffic.coordinator.models.RegisterRequest;
 import sd.traffic.common.ConfigLoader;
 
@@ -41,6 +42,17 @@ public class CoordinatorServer {
 
     /** Store de eventos: append em logs/events.json */
     private final EventLogStore eventLogStore;
+
+    private final PhaseController phaseController = new PhaseController();
+    private final LamportClock clock = new LamportClock();
+
+    public PhaseController getPhaseController() {
+        return phaseController;
+    }
+
+    public LamportClock getClock() {
+        return clock;
+    }
 
     public static void main(String[] args) {
         new CoordinatorServer().start();

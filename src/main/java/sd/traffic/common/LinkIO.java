@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Classe utilitária para comunicação TCP confiável com retry e timeout.
- * Baseia-se em sockets Java e usa Gson para serialização JSON.
+ * Baseia-se em sockets e usa Gson para serialização JSON.
  * Inspirada nos exemplos de comunicação das fichas FP4.
  */
 public class LinkIO {

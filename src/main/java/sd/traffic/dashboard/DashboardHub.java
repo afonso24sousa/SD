@@ -39,7 +39,7 @@ public class DashboardHub {
             LinkIO link = new LinkIO(HOST, COORDINATOR_PORT);
             link.connect();
 
-            // Enviar REGISTER (construtor correto!)
+            // Enviar REGISTER
             RegisterRequest reg = new RegisterRequest();
             reg.setNodeId("DashboardHub");
             reg.setRole("dashboard");
