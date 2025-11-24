@@ -5,6 +5,7 @@ import sd.traffic.common.LinkIO;
 import sd.traffic.common.Message;
 import sd.traffic.coordinator.models.RegisterRequest;
 import sd.traffic.coordinator.models.TelemetryPayload;
+import sd.traffic.coordinator.models.VehicleTransfer;
 import sd.traffic.model.LightColor;
 
 import java.io.BufferedReader;
@@ -17,14 +18,13 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * Representa um cruzamento como um processo TCP independente.
- * Fase 2: liga-se ao Coordinator, envia REGISTER e telemetria periódica.
  */
 public class CrossingProcess {
 
     private final String id;
     private final int localPort;
     private final LinkIO linkCoordinator;
-    private final BlockingQueue<String> queue = new LinkedBlockingQueue<>(); // placeholder para veículos
+    private final BlockingQueue<VehicleTransfer> queue = new LinkedBlockingQueue<>(); // agora guarda objetos
     private final Gson gson = new Gson();
 
     // Configurações simples
@@ -47,13 +47,13 @@ public class CrossingProcess {
         // 2. Enviar REGISTER
         sendRegister();
 
-        // 3. Iniciar servidor para receber mensagens (ex.: VehicleTransfer futuro)
+        // 3. Iniciar servidor para receber mensagens (VehicleTransfer)
         new Thread(this::startServerSocket, "Server-" + id).start();
 
         // 4. Iniciar envio de telemetria
         new Thread(this::sendTelemetryLoop, "Telemetry-" + id).start();
 
-        // 5. Iniciar escuta de mensagens do Coordinator (ex.: POLICY_UPDATE futuro)
+        // 5. Iniciar escuta de mensagens do Coordinator (POLICY_UPDATE futuro)
         new Thread(this::handleMessages, "CoordinatorListener-" + id).start();
     }
 
@@ -82,8 +82,20 @@ public class CrossingProcess {
             String line;
             while ((line = in.readLine()) != null) {
                 System.out.println("[Crossing " + id + "] Mensagem recebida: " + line);
-                // Nesta fase, apenas regista mensagens (VehicleTransfer será usado nas fases seguintes)
-                queue.add(line);
+
+                // Parse da mensagem para VehicleTransfer
+                try {
+                    Message<?> msg = gson.fromJson(line, Message.class);
+                    if ("VehicleTransfer".equalsIgnoreCase(msg.getType())) {
+                        VehicleTransfer vt = gson.fromJson(gson.toJson(msg.getPayload()), VehicleTransfer.class);
+                        queue.add(vt);
+                        System.out.println("[Crossing " + id + "] VehicleTransfer adicionado à fila: " + vt);
+                    } else {
+                        System.out.println("[Crossing " + id + "] Tipo de mensagem não suportado: " + msg.getType());
+                    }
+                } catch (Exception e) {
+                    System.err.println("[Crossing " + id + "] Erro ao processar mensagem: " + e.getMessage());
+                }
             }
         } catch (IOException e) {
             System.err.println("[Crossing " + id + "] Conexão encerrada: " + e.getMessage());
@@ -100,7 +112,6 @@ public class CrossingProcess {
                 tel.setLightState(currentLight);
 
                 linkCoordinator.send(new Message<>("TELEMETRY", tel));
-                // Sleep para envio periódico de telemetria
                 Thread.sleep(telemetryIntervalMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -115,7 +126,6 @@ public class CrossingProcess {
                 String line = linkCoordinator.receive();
                 if (line == null) break;
                 System.out.println("[Crossing " + id + "] Mensagem do Coordinator: " + line);
-                // Nesta fase, apenas imprime (POLICY_UPDATE será tratado na Fase 6)
             }
         } catch (IOException e) {
             System.err.println("[Crossing " + id + "] Erro ao ler do Coordinator: " + e.getMessage());
