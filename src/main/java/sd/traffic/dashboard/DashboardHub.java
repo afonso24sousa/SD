@@ -9,7 +9,7 @@ import sd.traffic.coordinator.models.TelemetryPayload;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * DashboardHub (versão correta para a Fase 2):
+ * DashboardHub:
  *
  * - Liga-se ao Coordinator (porta 6000)
  * - Envia REGISTER {"nodeId": "DashboardHub"}
