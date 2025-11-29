@@ -33,7 +33,7 @@ public class TelemetryPayload {
                 "crossing='" + crossing + '\'' +
                 ", queue=" + queue +
                 ", avg=" + avg +
-                ", lightState=" + lightState + '\'' +
+                ", lightState=" + lightState +
                 '}';
     }
 }

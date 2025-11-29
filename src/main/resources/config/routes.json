@@ -1,17 +1,17 @@
 {
   "E1": [
-    { "path": ["E1", "Cr1", "Cr4", "Cr5", "S"], "prob": 0.34 },
-    { "path": ["E1", "Cr1", "Cr2", "Cr5", "S"], "prob": 0.33 },
-    { "path": ["E1", "Cr1", "Cr2", "Cr3", "S"], "prob": 0.33 }
+    { "path": ["E1", "Cr1", "Cr4", "Cr5", "S"], "probability": 34 },
+    { "path": ["E1", "Cr1", "Cr2", "Cr5", "S"], "probability": 33 },
+    { "path": ["E1", "Cr1", "Cr2", "Cr3", "S"], "probability": 33 }
   ],
   "E2": [
-    { "path": ["E2", "Cr2", "Cr5", "S"], "prob": 0.34 },
-    { "path": ["E2", "Cr2", "Cr3", "S"], "prob": 0.33 },
-    { "path": ["E2", "Cr2", "Cr1", "Cr4", "Cr5", "S"], "prob": 0.33 }
+    { "path": ["E2", "Cr2", "Cr5", "S"], "probability": 34 },
+    { "path": ["E2", "Cr2", "Cr3", "S"], "probability": 33 },
+    { "path": ["E2", "Cr2", "Cr1", "Cr4", "Cr5", "S"], "probability": 33 }
   ],
   "E3": [
-    { "path": ["E3", "Cr3", "S"], "prob": 0.34 },
-    { "path": ["E3", "Cr3", "Cr2", "Cr5", "S"], "prob": 0.33 },
-    { "path": ["E3", "Cr3", "Cr2", "Cr1", "Cr4", "Cr5", "S"], "prob": 0.33 }
+    { "path": ["E3", "Cr3", "S"], "probability": 34 },
+    { "path": ["E3", "Cr3", "Cr2", "Cr5", "S"], "probability": 33 },
+    { "path": ["E3", "Cr3", "Cr2", "Cr1", "Cr4", "Cr5", "S"], "probability": 33 }
   ]
 }

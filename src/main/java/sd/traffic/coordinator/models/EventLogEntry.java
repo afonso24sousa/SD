@@ -10,6 +10,8 @@ public class EventLogEntry {
     private String node;      // "Cr1", "Cr2", "S", etc.
     private String details;   // livre
 
+    public EventLogEntry() { }
+
     public EventLogEntry(String type, double simTime, String node, String details) {
         this.type = type;
         this.simTime = simTime;

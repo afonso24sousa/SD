@@ -1,9 +1,9 @@
 @echo off
 echo ===============================
 echo Iniciando Crossing Cr4...
-echo Porta: 6104
+echo Porta: 6004
 echo ===============================
 
-mvn compile exec:java -D exec.mainClass="sd.traffic.crossing.CrossingProcess" -D exec.args="Cr4 6104"
+mvn compile exec:java -Dexec.mainClass="sd.traffic.crossing.CrossingProcess" -Dexec.args="Cr4 6104"
 
 pause

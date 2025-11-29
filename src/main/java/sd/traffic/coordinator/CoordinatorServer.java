@@ -147,6 +147,33 @@ public class CoordinatorServer {
         }
     }
 
+    /** Obtém socket do nó registado */
+    public Socket getNodeSocket(String id) {
+        return registeredNodes.get(id);
+    }
+
+    /** Envia mensagem JSON para um nó específico */
+    public boolean sendToNode(String nodeId, Object msg) {
+        Socket s = registeredNodes.get(nodeId);
+        if (s == null || s.isClosed()) {
+            System.err.println("[Coordinator] Nó destino não encontrado: " + nodeId);
+            return false;
+        }
+
+        try {
+            PrintWriter out = new PrintWriter(
+                    new OutputStreamWriter(s.getOutputStream(), StandardCharsets.UTF_8),
+                    true
+            );
+            out.println(gson.toJson(msg));
+            return true;
+
+        } catch (IOException e) {
+            System.err.println("[Coordinator] Erro ao enviar a " + nodeId + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     /** Pede a política atual em JSON (carregada do ficheiro). */
     public String getCurrentPolicyJson() {
         return policyManager.getPolicyJson();

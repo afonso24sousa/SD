@@ -112,15 +112,17 @@ public class ClientHandler extends Thread {
 
                             server.appendEvent(gson.toJson(vt));
 
+                            // reencaminhar ao cruzamento de destino
+                            boolean sent = server.sendToNode(vt.getTo(),
+                                    new Message<>("VehicleArrival", vt));
+
                             JsonObject okV = new JsonObject();
-                            okV.addProperty("status", "VEHICLE_TRANSFER_OK");
-                            okV.addProperty("from", vt.getFrom());
-                            okV.addProperty("to", vt.getTo());
-                            okV.addProperty("vehicle", vt.getVehicleId());
+                            okV.addProperty("status", sent ? "VEHICLE_TRANSFER_OK" : "DESTINATION_NOT_FOUND");
                             sendOk(out, okV);
 
                             break;
                         }
+
 
                         case "PHASE_REQUEST": {
                             PhaseRequest req = gson.fromJson(gson.toJson(base.getPayload()), PhaseRequest.class);
