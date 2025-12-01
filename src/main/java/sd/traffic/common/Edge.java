@@ -11,13 +11,13 @@ package sd.traffic.common;
 public class Edge {
 
     /** Nó de origem da ligação (por exemplo, Cr1) */
-    private NodeId from;
+    private final NodeId from;
 
     /** Nó de destino da ligação (por exemplo, Cr2) */
-    private NodeId to;
+    private final NodeId to;
 
     /** Tempo base necessário para percorrer a rua (t_road) */
-    private double tRoad;
+    private final double tRoad;
 
     /**
      * Construtor da classe Edge.

@@ -4,6 +4,15 @@ import java.util.List;
 import sd.traffic.common.NodeId;
 import sd.traffic.common.VehicleType;
 
+/**
+ * Representa a transferência de um veículo entre nós da malha.
+ *
+ * Usado como payload de:
+ *   { "type":"VehicleTransfer", "payload": { ... } }
+ *
+ * - Enviado pelos EntryGenerators para o 1º cruzamento
+ * - Enviado pelos Crossings para o próximo nó (Crossing ou S)
+ */
 public class VehicleTransfer {
 
     private String vehicleId;
@@ -11,9 +20,14 @@ public class VehicleTransfer {
     private String to;
     private double time;
 
-    private List<NodeId> path;   // NOVO
-    private int index;           // NOVO
-    private VehicleType type;    // NOVO
+    /** Caminho completo do veículo. */
+    private List<NodeId> path;
+
+    /** Índice do nó atual no path. */
+    private int index;
+
+    /** Tipo do veículo (MOTA, CARRO, CAMIAO). */
+    private VehicleType type;
 
     public VehicleTransfer() {}
 
@@ -48,7 +62,6 @@ public class VehicleTransfer {
                 '}';
     }
 
-    // GETTERS NECESSÁRIOS
     public String getVehicleId() { return vehicleId; }
     public String getFrom() { return from; }
     public String getTo() { return to; }

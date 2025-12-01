@@ -5,31 +5,26 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Identificação do projeto -->
     <groupId>sd</groupId>
     <artifactId>traffic-sim</artifactId>
     <version>1.0-SNAPSHOT</version>
     <name>SD Traffic Simulation</name>
     <description>Simulação de tráfego (Sistemas Distribuídos 2025)</description>
 
-    <!-- Configurações gerais -->
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- Dependências -->
     <dependencies>
 
-        <!-- Gson: para serialização e desserialização JSON -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
         </dependency>
 
-        <!-- JUnit 5: para testes unitários -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -39,11 +34,9 @@
 
     </dependencies>
 
-    <!-- Configuração do build -->
     <build>
         <plugins>
 
-            <!-- Plugin do compilador Java -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -53,7 +46,6 @@
                 </configuration>
             </plugin>
 
-            <!-- Plugin de testes -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -63,11 +55,47 @@
                 </configuration>
             </plugin>
 
-            <!-- Plugin para executar a simulação diretamente -->
+            <!-- Exec plugin configurado corretamente -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.6.2</version>
+
+                <executions>
+
+                    <!-- Coordinator -->
+                    <execution>
+                        <id>run-coordinator</id>
+                        <configuration>
+                            <mainClass>sd.traffic.coordinator.CoordinatorServer</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <!-- Dashboard -->
+                    <execution>
+                        <id>run-dashboard</id>
+                        <configuration>
+                            <mainClass>sd.traffic.dashboard.DashboardHub</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <!-- Crossings -->
+                    <execution>
+                        <id>run-crossing</id>
+                        <configuration>
+                            <mainClass>sd.traffic.crossing.CrossingProcess</mainClass>
+                        </configuration>
+                    </execution>
+
+                    <!-- Entry Generator -->
+                    <execution>
+                        <id>run-entry-generator</id>
+                        <configuration>
+                            <mainClass>sd.traffic.entry.EntryGeneratorProcess</mainClass>
+                        </configuration>
+                    </execution>
+
+                </executions>
             </plugin>
 
         </plugins>

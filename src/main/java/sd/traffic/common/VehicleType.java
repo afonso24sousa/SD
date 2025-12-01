@@ -6,9 +6,9 @@ package sd.traffic.common;
  * Cada tipo possui:
  *  - um fator de velocidade relativo (para cálculo de t_road),
  *  - uma percentagem de ocorrência (para geração de tráfego),
- *  - e uma cor usada na visualização (dashboard).</p>
+ *  - e uma cor usada na visualização (dashboard).
  *
- * Exemplo: MOTA é 2x mais rápida que o carro, enquanto CAMIAO é 2x mais lento.</p>
+ * Exemplo: MOTA é 2x mais rápida que o carro, enquanto CAMIAO é 2x mais lento.
  */
 public enum VehicleType {
 
@@ -39,4 +39,22 @@ public enum VehicleType {
     public double getFactor() { return factor; }
     public int getPercentage() { return percentage; }
     public String getColor() { return color; }
+
+    /**
+     * Utilitário: dada um número entre 0 e 99, devolve o tipo de veículo
+     * correspondente às percentagens definidas.
+     *
+     * Exemplo:
+     *   int r = random.nextInt(100);
+     *   VehicleType type = VehicleType.fromRandomPercentage(r);
+     */
+    public static VehicleType fromRandomPercentage(int r) {
+        int cumulative = 0;
+        for (VehicleType t : values()) {
+            cumulative += t.percentage;
+            if (r < cumulative) return t;
+        }
+        // fallback defensivo
+        return CARRO;
+    }
 }

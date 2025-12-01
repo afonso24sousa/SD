@@ -2,6 +2,7 @@ package sd.traffic.common;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
 import java.io.FileReader;
 import java.io.IOException;
 
@@ -18,6 +19,11 @@ import java.io.IOException;
  *  - src/main/resources/config/routes.json
  */
 public class ConfigLoader {
+
+    // Caminhos padrão usados em todo o projeto
+    public static final String DEFAULT_CONFIG_PATH = "src/main/resources/config/default_config.json";
+    public static final String POLICY_CONFIG_PATH   = "src/main/resources/config/policy_hybrid.json";
+    public static final String ROUTES_CONFIG_PATH   = "src/main/resources/config/routes.json";
 
     /**
      * Lê um ficheiro JSON e converte o conteúdo num objeto JsonObject.
@@ -36,13 +42,34 @@ public class ConfigLoader {
     }
 
     /**
+     * Atalho para carregar o ficheiro de configuração principal da simulação.
+     */
+    public static JsonObject loadDefaultConfig() {
+        return load(DEFAULT_CONFIG_PATH);
+    }
+
+    /**
+     * Atalho para carregar o ficheiro de política de semáforos.
+     */
+    public static JsonObject loadPolicyConfig() {
+        return load(POLICY_CONFIG_PATH);
+    }
+
+    /**
+     * Atalho para carregar o ficheiro de rotas.
+     */
+    public static JsonObject loadRoutesConfig() {
+        return load(ROUTES_CONFIG_PATH);
+    }
+
+    /**
      * Método de teste rápido para validar a leitura de ficheiros JSON.
      *
      * Permite verificar se o Gson está a funcionar e se os caminhos estão corretos.
      * Deve ser executado apenas para debug — não faz parte da simulação.
      */
     public static void main(String[] args) {
-        JsonObject config = load("src/main/resources/config/default_config.json");
+        JsonObject config = loadDefaultConfig();
         System.out.println("Config carregada com sucesso:");
         System.out.println(config);
     }

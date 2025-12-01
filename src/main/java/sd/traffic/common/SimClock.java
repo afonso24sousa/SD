@@ -31,6 +31,14 @@ public class SimClock {
     }
 
     /**
+     * Define explicitamente o tempo simulado atual.
+     * Útil quando seguimos uma lista de eventos discretos.
+     */
+    public synchronized void setSimTime(double newTime) {
+        this.currentSimTime = newTime;
+    }
+
+    /**
      * Avança o tempo simulado em um dado intervalo.
      * Usado para simular a passagem de tempo entre eventos.
      *
@@ -59,5 +67,10 @@ public class SimClock {
     /** Define uma nova escala de tempo. */
     public void setTimeScale(double timeScale) {
         this.timeScale = timeScale;
+    }
+
+    /** Reinicia o relógio para 0 (útil em testes ou novos cenários). */
+    public synchronized void reset() {
+        this.currentSimTime = 0.0;
     }
 }

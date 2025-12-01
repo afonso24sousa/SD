@@ -23,12 +23,13 @@ public class Message<T> {
     private T payload;
 
     /** Construtor vazio exigido pelo Gson */
-    public Message() {}
+    public Message() {
+    }
 
     /**
      * Construtor principal.
      *
-     * @param type Tipo da mensagem
+     * @param type    Tipo da mensagem
      * @param payload Dados associados à mensagem
      */
     public Message(String type, T payload) {

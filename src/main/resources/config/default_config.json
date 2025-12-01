@@ -7,6 +7,7 @@
     "time_scale": 0.05,
     "t_road": 5,
     "t_sem": 1.5,
+    "t_max": 300.0,
     "t_yellow": 2,
     "t_clearance": 1
   },

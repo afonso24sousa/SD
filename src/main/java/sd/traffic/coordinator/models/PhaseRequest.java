@@ -2,21 +2,27 @@ package sd.traffic.coordinator.models;
 
 /**
  * Pedido de abertura de fase (semáforo verde) num cruzamento.
- * Enviado pelo Crossing para o Coordinator.
+ *
+ * Enviado pelo Crossing para o Coordinator, que usa PhaseController
+ * para garantir exclusão mútua entre direções (NS vs EW vs peões).
  */
 public class PhaseRequest {
 
+    /** Identificador do cruzamento (ex.: "Cr1"). */
     private String crossing;
+
+    /** Direção/local da fase pedida: "N", "S", "E", "W" ou "PEDESTRIAN". */
     private String direction;
-    // opcional: timestamp lógico enviado pelo nó (pode vir a null nesta fase)
+
+    /** Timestamp lógico (Lamport) ou físico (opcional). */
     private Long timestamp;
 
     public PhaseRequest() { }
 
-    public PhaseRequest(String crossing, String direction, Long timestamp) {
+    public PhaseRequest(String crossing, String direction) {
         this.crossing = crossing;
         this.direction = direction;
-        this.timestamp = timestamp;
+        this.timestamp = null;
     }
 
     public String getCrossing() {

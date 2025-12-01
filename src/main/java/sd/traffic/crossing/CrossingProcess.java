@@ -1,6 +1,7 @@
 package sd.traffic.crossing;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import sd.traffic.common.*;
 import sd.traffic.coordinator.models.*;
 import sd.traffic.model.LightColor;
@@ -10,26 +11,22 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
+import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 /**
- * FASE 3 / 4 / 5 - Membro B
+ * CrossingProcess — VERSÃO FINAL CORRIGIDA
  *
- * Neste ponto o Crossing faz:
- *  - registo no Coordinator (REGISTER)
- *  - mantém QUATRO filas por direção (N, S, E, W)
- *  - recebe VehicleArrival (enviado pelo Coordinator quando recebe VehicleTransfer)
- *  - determina direção aproximada do veículo (N/S) a partir de (from,to)
- *  - faz pedido PHASE_REQUEST ao Coordinator (que usa PhaseController para exclusão mútua)
- *  - processa o veículo com tempo simulado
- *  - liberta a fase com PHASE_RELEASE
- *  - envia EVENT_LOG para registar saída do cruzamento
- *  - envia telemetria real (tamanho das filas + estado da luz)
- *
- * Na Fase 5 o encaminhamento é real seguindo o path completo do veículo.
+ * - Integra PhaseController GLOBAL (PHASE_REQUEST / PHASE_RELEASE)
+ * - Semáforos N/S/E/W por thread
+ * - PedestrianSemaphore automático apenas no Cr4
+ * - Telemetria completa (fila total e média, estado da luz)
+ * - Receção eficiente via receiveNonBlocking()
+ * - Encaminhamento correto VehicleArrival → fila
+ * - forwardVehicle → VehicleTransfer ou EXIT
  */
+
 public class CrossingProcess {
 
     private final String id;
@@ -38,70 +35,138 @@ public class CrossingProcess {
     private final Gson gson = new Gson();
     private final LinkIO linkCoordinator;
 
-    /** Filas por direção — AGORA thread-safe manualmente usando synchronized+wait/notify */
     private final Map<String, VehicleQueue> queues = new HashMap<>();
+    private final Map<String, CrossingSemaphore> semaphores = new HashMap<>();
+    private PedestrianSemaphore pedestrianSemaphore;
 
-    private volatile LightColor currentLight = LightColor.RED;
     private final SimClock simClock = new SimClock();
 
-    private final double tRoad = 3.0;
-    private final long telemetryIntervalMs = 2000;
+    private final double tRoad;
+    private final double tSem;
+
+    private volatile LightColor currentLight = LightColor.RED;
+    private volatile Policy localPolicy = null;
+
+    private final long telemetryIntervalMs = 2000L;
+    private volatile boolean running = true;
+
+    private ServerSocket serverSocket;
+
+
+    // =====================================================================
+    // CONSTRUCTOR
+    // =====================================================================
 
     public CrossingProcess(String id, int port) {
         this.id = id;
         this.localPort = port;
         this.linkCoordinator = new LinkIO("localhost", 6000);
 
-        // Criar 4 filas thread-safe
+        JsonObject cfg = ConfigLoader.loadDefaultConfig();
+        JsonObject simCfg = cfg.getAsJsonObject("simulation");
+
+        double tmpRoad = 3.0;
+        double tmpSem = 1.5;
+
+        try {
+            if (simCfg.has("t_road")) tmpRoad = simCfg.get("t_road").getAsDouble();
+            if (simCfg.has("t_sem")) tmpSem = simCfg.get("t_sem").getAsDouble();
+        } catch (Exception ignore) {}
+
+        this.tRoad = tmpRoad;
+        this.tSem = tmpSem;
+
         queues.put("N", new VehicleQueue());
         queues.put("S", new VehicleQueue());
         queues.put("E", new VehicleQueue());
         queues.put("W", new VehicleQueue());
+
+        semaphores.put("N", new CrossingSemaphore(id, "N", queues.get("N"), this, simClock, tSem));
+        semaphores.put("S", new CrossingSemaphore(id, "S", queues.get("S"), this, simClock, tSem));
+        semaphores.put("E", new CrossingSemaphore(id, "E", queues.get("E"), this, simClock, tSem));
+        semaphores.put("W", new CrossingSemaphore(id, "W", queues.get("W"), this, simClock, tSem));
+
+        if ("Cr4".equals(id)) {
+            pedestrianSemaphore = new PedestrianSemaphore(
+                    id,
+                    this,
+                    simClock,
+                    4.0,
+                    12000
+            );
+        }
     }
 
-    /** Arranque do processo */
+
+    // =====================================================================
+    // START
+    // =====================================================================
+
     public void start() {
+
         if (!linkCoordinator.connect()) {
             System.err.println("[Crossing " + id + "] Falha ao ligar ao Coordinator.");
             return;
         }
 
         sendRegister();
+        requestInitialPolicy();
 
         new Thread(this::startServerSocket, "CrossingServer-" + id).start();
         new Thread(this::telemetryLoop, "Telemetry-" + id).start();
-        new Thread(this::loopProcessamento, "Processor-" + id).start();
         new Thread(this::listenCoordinator, "CoordinatorListener-" + id).start();
+
+        semaphores.values().forEach(Thread::start);
+
+        if (pedestrianSemaphore != null)
+            pedestrianSemaphore.start();
     }
 
-    /** Envia REGISTER ao Coordinator */
+
+    // =====================================================================
+    // REGISTER
+    // =====================================================================
+
     private void sendRegister() {
         RegisterRequest req = new RegisterRequest();
         req.setNodeId(id);
         req.setRole("CROSSING");
         linkCoordinator.send(new Message<>("REGISTER", req));
-        System.out.println("[Crossing " + id + "] REGISTER enviado ao Coordinator.");
     }
 
-    /** ServerSocket: recebe VehicleArrival do Coordinator */
+    private void requestInitialPolicy() {
+        linkCoordinator.send(new Message<>("POLICY_UPDATE", "REQUEST_POLICY"));
+    }
+
+
+    // =====================================================================
+    // SERVER SOCKET — RECEÇÃO DE VehicleArrival
+    // =====================================================================
+
     private void startServerSocket() {
-        try (ServerSocket ss = new ServerSocket(localPort)) {
+        try {
+            serverSocket = new ServerSocket(localPort);
+            serverSocket.setSoTimeout(500);
+
             System.out.println("[Crossing " + id + "] A ouvir em " + localPort);
 
-            while (true) {
-                Socket s = ss.accept();
-                new Thread(() -> handleIncoming(s),
-                        "Incoming-" + id + "-" + s.getRemoteSocketAddress()).start();
+            while (running) {
+                try {
+                    Socket s = serverSocket.accept();
+                    new Thread(() -> handleIncoming(s), "CrossingIncoming-" + id).start();
+                } catch (SocketTimeoutException ignore) {
+                    // apenas acorda para verificar running
+                }
             }
 
         } catch (IOException e) {
-            System.err.println("[Crossing " + id + "] Erro no server socket: " + e.getMessage());
+            System.err.println("[Crossing " + id + "] Server error: " + e.getMessage());
         }
     }
 
-    /** Recebe VehicleArrival e coloca na fila correta */
     private void handleIncoming(Socket s) {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream()))) {
+        try (BufferedReader in = new BufferedReader(
+                new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))) {
 
             String line;
             while ((line = in.readLine()) != null) {
@@ -109,10 +174,12 @@ public class CrossingProcess {
                 Message<?> msg = gson.fromJson(line, Message.class);
                 if (msg == null || msg.getType() == null) continue;
 
-                if (msg.getType().equals("VehicleArrival")) {
+                if ("VehicleArrival".equals(msg.getType())) {
 
-                    VehicleTransfer vt =
-                            gson.fromJson(gson.toJson(msg.getPayload()), VehicleTransfer.class);
+                    VehicleTransfer vt = gson.fromJson(
+                            gson.toJson(msg.getPayload()),
+                            VehicleTransfer.class
+                    );
 
                     Vehicle v = new Vehicle();
                     v.setId(vt.getVehicleId());
@@ -121,117 +188,164 @@ public class CrossingProcess {
                     v.setType(vt.getType());
                     v.setEnteredAtSimTime(vt.getTime());
 
-                    List<NodeId> path = vt.getPath();
-                    int idx = vt.getIndex();
-
-                    String direction =
-                            inferDirection(path.get(idx - 1).name(), path.get(idx).name());
-
-                    VehicleQueue q = queues.get(direction);
-                    if (q == null) {
-                        System.err.println("[Crossing " + id + "] Direção inválida: " + direction);
+                    String direction = inferDirection(vt.getFrom(), vt.getTo());
+                    if (direction == null) {
+                        System.err.println("[Crossing " + id + "] Edge não mapeado: "
+                                + vt.getFrom() + ">" + vt.getTo());
                         continue;
                     }
 
-                    q.enqueue(v);
-                    System.out.println("[Crossing " + id + "] Veículo " + v.getId() +
-                            " entrou pela direção " + direction);
+                    queues.get(direction).enqueue(v);
+
+                    EventLogEntry ev = new EventLogEntry(
+                            "VEHICLE_ARRIVAL",
+                            simClock.getSimTime(),
+                            id,
+                            v.getId(),
+                            "from=" + vt.getFrom() + ", to=" + vt.getTo() + ", dir=" + direction
+                    );
+                    linkCoordinator.send(new Message<>("EVENT_LOG", ev));
                 }
             }
 
         } catch (IOException e) {
-            System.err.println("[Crossing " + id + "] Erro incoming: " + e.getMessage());
+            System.err.println("[Crossing " + id + "] Incoming error: " + e.getMessage());
         }
     }
 
-    /** Direção estimada */
-    private String inferDirection(String from, String to) {
+
+    // =====================================================================
+    // LISTEN COORDINATOR (POLICY + STOP)
+    // =====================================================================
+
+    private void listenCoordinator() {
         try {
-            NodeId f = NodeId.valueOf(from);
-            NodeId t = NodeId.valueOf(to);
-            return (f.ordinal() < t.ordinal()) ? "N" : "S";
-        } catch (Exception e) {
-            return (from.compareTo(to) < 0) ? "N" : "S";
-        }
-    }
+            while (running) {
 
-    /**
-     * Loop principal:
-     * - Espera veículo em fila usando wait()
-     * - Pede fase
-     * - Simula tempo
-     * - Encaminha ou regista saída
-     * - Liberta fase
-     */
-    private void loopProcessamento() {
-        while (true) {
-            try {
-                String direction = pickDirection();
-                if (direction == null) {
-                    Thread.sleep(20);
+                String line = linkCoordinator.receiveNonBlocking();
+                if (line == null) {
+                    Thread.sleep(40);
                     continue;
                 }
 
-                VehicleQueue q = queues.get(direction);
-                if (q == null) continue;
+                Message<?> msg = gson.fromJson(line, Message.class);
+                if (msg == null || msg.getType() == null) continue;
 
-                // poll() BLOQUEIA com wait() até haver veículos
-                Vehicle v = q.poll();
+                switch (msg.getType()) {
 
-                sendPhaseRequest(direction);
-                currentLight = LightColor.GREEN;
+                    case "POLICY":
+                        String jsonPolicy = (String) msg.getPayload();
+                        localPolicy = gson.fromJson(jsonPolicy, Policy.class);
+                        System.out.println("[Crossing " + id + "] Política atualizada: " + localPolicy);
+                        break;
 
-                double factor = v.getType().getFactor();
-                double simDelta = tRoad * factor;
-                Thread.sleep(simClock.toRealMillis(simDelta));
-                simClock.advance(simDelta);
-
-                forwardVehicle(v);
-
-                sendPhaseRelease(direction);
-                currentLight = LightColor.RED;
-
-            } catch (Exception e) {
-                System.err.println("[Crossing " + id + "] Erro loopProcessamento: " + e.getMessage());
+                    case "STOP":
+                        System.out.println("[Crossing " + id + "] STOP recebido — a encerrar.");
+                        shutdown();
+                        return;
+                }
             }
+
+        } catch (Exception e) {
+            System.err.println("[Crossing " + id + "] Erro leitura Coordinator: " + e.getMessage());
         }
     }
 
-    /** Escolhe uma direção com fila não vazia (sem bloquear) */
-    private String pickDirection() {
-        for (var e : queues.entrySet()) {
-            if (!e.getValue().isEmpty()) return e.getKey();
+
+    public Policy getPolicy() {
+        return localPolicy;
+    }
+
+
+    // =====================================================================
+    // DIREÇÕES (from→to)
+    // =====================================================================
+
+    private String inferDirection(String from, String to) {
+        switch (from + ">" + to) {
+
+            case "Cr1>Cr2": return "S";
+            case "Cr2>Cr1": return "N";
+
+            case "Cr2>Cr3": return "S";
+            case "Cr3>Cr2": return "N";
+
+            case "Cr1>Cr4": return "E";
+            case "Cr4>Cr1": return "W";
+
+            case "Cr4>Cr5": return "S";
+            case "Cr5>Cr4": return "N";
+
+            case "Cr2>Cr5": return "E";
+            case "Cr5>Cr2": return "W";
+
+            default:
+                return null;
         }
-        return null;
     }
 
-    private void sendPhaseRequest(String dir) {
-        PhaseRequest pr = new PhaseRequest(id, dir, null);
-        linkCoordinator.send(new Message<>("PHASE_REQUEST", pr));
+
+    // =====================================================================
+    // PHASE CONTROLLER GLOBAL
+    // =====================================================================
+
+    public void requestGreenGlobal(String direction) {
+        linkCoordinator.send(new Message<>("PHASE_REQUEST", new PhaseRequest(id, direction)));
     }
 
-    private void sendPhaseRelease(String dir) {
-        PhaseRelease rel = new PhaseRelease(id, dir, null);
-        linkCoordinator.send(new Message<>("PHASE_RELEASE", rel));
+    public void releaseGreenGlobal(String direction) {
+        linkCoordinator.send(new Message<>("PHASE_RELEASE", new PhaseRelease(id, direction)));
     }
 
-    /** Encaminhamento real */
-    private void forwardVehicle(Vehicle v) {
+    public void requestPedestrianGreenGlobal() {
+        linkCoordinator.send(new Message<>("PHASE_REQUEST", new PhaseRequest(id, "PEDESTRIAN")));
+    }
+
+    public void releasePedestrianGreenGlobal() {
+        linkCoordinator.send(new Message<>("PHASE_RELEASE", new PhaseRelease(id, "PEDESTRIAN")));
+    }
+
+
+    public LinkIO getCoordinatorLink() {
+        return linkCoordinator;
+    }
+
+
+    // =====================================================================
+    // FORWARD VEHICLE
+    // =====================================================================
+
+    public void forwardVehicle(Vehicle v) {
+
         List<NodeId> path = v.getPath();
-        int index = v.getPathIndex();
+        int nextIndex = v.getPathIndex() + 1;
 
-        if (index + 1 >= path.size()) {
+        if (nextIndex >= path.size()) {
+
+            v.setLeftAtSimTime(simClock.getSimTime());
+
             EventLogEntry ev = new EventLogEntry(
                     "VEHICLE_EXIT",
                     simClock.getSimTime(),
                     id,
-                    "Vehicle=" + v.getId()
+                    v.getId(),
+                    "dwellingTime=" + v.getDwellingTime()
             );
             linkCoordinator.send(new Message<>("EVENT_LOG", ev));
             return;
         }
 
-        NodeId next = path.get(index + 1);
+        NodeId next = path.get(nextIndex);
+
+        double simDelta = tRoad * v.getType().getFactor();
+
+        try {
+            Thread.sleep(simClock.toRealMillis(simDelta));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        simClock.advance(simDelta);
 
         VehicleTransfer vt = new VehicleTransfer(
                 v.getId(),
@@ -239,47 +353,80 @@ public class CrossingProcess {
                 next.name(),
                 simClock.getSimTime(),
                 path,
-                index + 1,
+                nextIndex,
                 v.getType()
         );
 
         linkCoordinator.send(new Message<>("VehicleTransfer", vt));
     }
 
-    /** Loop de telemetria */
+
+    // =====================================================================
+    // TELEMETRIA
+    // =====================================================================
+
     private void telemetryLoop() {
-        while (true) {
+        while (running) {
             try {
-                TelemetryPayload tp = new TelemetryPayload();
-                tp.setCrossing(id);
+                queues.values().forEach(VehicleQueue::sample);
 
-                int total = 0;
-                for (VehicleQueue q : queues.values()) total += q.size();
-                tp.setQueue(total);
+                TelemetryPayload t = new TelemetryPayload();
+                t.setCrossing(id);
 
-                tp.setAvg(0.0);
-                tp.setLightState(currentLight);
+                int totalQueue = queues.values().stream().mapToInt(VehicleQueue::size).sum();
 
-                linkCoordinator.send(new Message<>("TELEMETRY", tp));
+                double avgQueue = queues.values()
+                        .stream()
+                        .mapToDouble(VehicleQueue::getAverageSize)
+                        .average()
+                        .orElse(0.0);
+
+                LightColor light = isCarPhaseActive() ? LightColor.GREEN : LightColor.RED;
+                currentLight = light;
+
+                t.setQueue(totalQueue);
+                t.setAvg(avgQueue);
+                t.setLightState(light);
+                t.setPedestrian(false);
+
+                linkCoordinator.send(new Message<>("TELEMETRY", t));
 
                 Thread.sleep(telemetryIntervalMs);
 
-            } catch (Exception ignored) {}
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
 
-    /** Listener passivo (PolicyUpdate no futuro) */
-    private void listenCoordinator() {
-        try {
-            while (true) {
-                String line = linkCoordinator.receive();
-                if (line == null) break;
-                System.out.println("[Coordinator→" + id + "] " + line);
-            }
-        } catch (Exception e) {
-            System.err.println("[Crossing " + id + "] Erro leitura Coordinator");
-        }
+
+    public boolean isCarPhaseActive() {
+        return semaphores.values().stream()
+                .anyMatch(CrossingSemaphore::isProcessing);
     }
+
+
+    // =====================================================================
+    // SHUTDOWN
+    // =====================================================================
+
+    public void shutdown() {
+        running = false;
+
+        try { semaphores.values().forEach(CrossingSemaphore::shutdown); } catch (Exception ignored) {}
+        try { if (pedestrianSemaphore != null) pedestrianSemaphore.shutdown(); } catch (Exception ignored) {}
+        try { linkCoordinator.close(); } catch (Exception ignored) {}
+
+        try { if (serverSocket != null) serverSocket.close(); } catch (Exception ignored) {}
+
+        System.out.println("[Crossing " + id + "] Encerrado.");
+    }
+
+
+    // =====================================================================
+    // MAIN
+    // =====================================================================
 
     public static void main(String[] args) {
         if (args.length < 2) {

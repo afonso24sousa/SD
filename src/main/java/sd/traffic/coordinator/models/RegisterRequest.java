@@ -1,12 +1,20 @@
 package sd.traffic.coordinator.models;
 
 /**
- * Payload para a mensagem REGISTER
+ * Payload para a mensagem REGISTER.
+ *
  * Exemplo:
  * { "type":"REGISTER", "payload": { "nodeId":"Cr1", "role":"CROSSING" } }
+ *
+ * role:
+ *  - "CROSSING"
+ *  - "DASHBOARD"
+ *  - "SINK"
+ *  - "ENTRY"
  */
 public class RegisterRequest {
-    private String nodeId; // ex.: "Cr1", "Dashboard", "Sink", "Entry-E1"
+
+    private String nodeId; // ex.: "Cr1", "DashboardHub", "Sink", "E1"
     private String role;   // "CROSSING", "DASHBOARD", "SINK", "ENTRY"
 
     public String getNodeId() { return nodeId; }

@@ -1,20 +1,28 @@
 package sd.traffic.coordinator.models;
 
 /**
- * Pedido de libertar a fase (semáforo deixa de estar verde).
+ * Pedido de libertar a fase (semáforo deixa de estar verde) num cruzamento.
+ *
+ * Enviado pelo Crossing para o Coordinator, que usa o PhaseController
+ * para libertar o grupo de direções e acordar outros semáforos.
  */
 public class PhaseRelease {
 
+    /** Identificador do cruzamento (ex.: "Cr1"). */
     private String crossing;
+
+    /** Direção/local lógica que está a ser libertada (ex.: "N", "S", "E", "W", "PEDESTRIAN"). */
     private String direction;
+
+    /** Timestamp lógico ou físico (opcional). Pode ser null. */
     private Long timestamp;
 
     public PhaseRelease() { }
 
-    public PhaseRelease(String crossing, String direction, Long timestamp) {
+    public PhaseRelease(String crossing, String direction) {
         this.crossing = crossing;
         this.direction = direction;
-        this.timestamp = timestamp;
+        this.timestamp = null;
     }
 
     public String getCrossing() {

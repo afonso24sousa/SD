@@ -1,12 +1,15 @@
 package sd.traffic.model;
 
 /**
- * Enumeração dos estados possíveis de um semáforo.
- * Utilizada tanto nos cruzamentos (CrossingProcess)
- * como no Dashboard e no Coordinator (telemetria).
+ * Estados possíveis de um semáforo.
+ * Utilizado:
+ *   - Nos Crossings (CrossingProcess)
+ *   - No Dashboard
+ *   - Na Telemetry (para mostrar estado atual)
  */
 public enum LightColor {
     RED,
     YELLOW,
-    GREEN
+    GREEN,
+    PEDESTRIAN
 }
